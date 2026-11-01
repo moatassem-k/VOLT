@@ -1,15 +1,20 @@
-TARGET=src/volt.py
-TEST=src/test.volt
+PROCESSOR=python3
 
-build: $(TARGET) $(TEST)
-	@python3 $(TARGET) $(TEST) out.asm
+SCRIPT=src/volt.py
+SOURCE=src/test.volt
+OUTPUT=out/out
 
-launch:
-	@echo launching $(TARGET)
+build: $(SCRIPT)
+# 	$(PROCESSOR) -m nuitka --onefile --follow-imports $(SCRIPT)
+	@echo building $(SCRIPT) 
 
-package: $(TARGET)
-# 	python3 -m nuitka --onefile --follow-imports $(TARGET)
-	@echo building $(TARGET)
+assemble: $(SCRIPT) $(SOURCE)
+	@echo compiling
+	$(PROCESSOR) $(SCRIPT) $(SOURCE) $(OUTPUT).asm
+
+compile: assemble
+	nasm -felf64 $(OUTPUT).asm
+	ld -o $(OUTPUT) $(OUTPUT).o
 
 clean:
 	rm -rf *.build *.dist *.onefile-build

@@ -36,6 +36,26 @@ class TokenType(Enum):
 
     # special_eof     = auto()
 
+class LitPatterns(Enum):
+    pattern_int   = r'\d+'
+    pattern_float = r'\d+\.\d+(?:[eE][+-]?\d+)?'
+    pattern_char  = r"'(?:\\.|[^'\\])'"
+    pattern_str   = r'"(?:\\.|[^"\\])*"'
+
+KEYWORDS = {
+    "if"     : TokenType.keyword_if,
+    "else"   : TokenType.keyword_else,
+    "return" : TokenType.keyword_return,
+    "exit"   : TokenType.keyword_exit,
+}
+
+LITERAL_PATTERNS = {
+    TokenType.lit_float : re.compile(LitPatterns.pattern_float.value),
+    TokenType.lit_int   : re.compile(LitPatterns.pattern_int.value),
+    TokenType.lit_char  : re.compile(LitPatterns.pattern_char.value),
+    TokenType.lit_str   : re.compile(LitPatterns.pattern_str.value),
+}
+
 class Token:
 	def __init__(self, type, value = None, row = 0, col = 0):
 		self.type  = type
@@ -44,7 +64,7 @@ class Token:
 		self.col   = col
 
 	def __repr__(self):
-		value = f"[{self.value}]" if self.value else ''
+		value = f"[{self.value}]" if self.value is not None else ''
 		return f"{self.type.name}({self.row}, {self.col}){value}"
 
 
@@ -60,8 +80,8 @@ class Tokenizer:
         ...
 
     def peek(self, offset = 0):
-        index = 0
-        if (index := self.idx + offset) >= self.len:
+        index = self.idx + offset
+        if index >= self.len:
             return None
         return self.src[index]
 
@@ -71,70 +91,71 @@ class Tokenizer:
         return self.src[idx]
 
     def peek_until(self, r_idx):
-        if r_idx >= self.len:
-            return None
-        return self.src[self.idx : r_idx]
+        return self.src[self.idx:r_idx]
 
-    def peek_and_check_match(self, check_fn, offset = 0):
-        c = self.peek(offset)
-        if c and check_fn(c):
-            return c
-        return None
+    def advance_position(self, text):
+        lines = text.split('\n')
 
-    def consume(self, count = 1):
-        self.idx += count
-        return self.src[self.idx - count : self.idx]
+        if len(lines) > 1:
+            self.row += len(lines) - 1
+            self.col = len(lines[-1]) + 1
+        else:
+            self.col += len(text)
+
+    def consume(self, count=1):
+        text = self.src[self.idx:self.idx + count]
+        self.idx += len(text)
+        self.advance_position(text)
+        return text
 
     def consume_until(self, r_idx):
-        l_idx = self.idx
-        self.idx = r_idx
-        return self.src[l_idx : r_idx]
+        return self.consume(r_idx - self.idx)
 
     def skip_whitespace(self):
-        c = self.src[self.idx]
-        if c.isspace():
-            if c == '\n':
-                self.row += 1
-                self.col = 1
-            elif c == ' ':
-                self.col += 1
-            self.idx += 1
-        return None
+        if self.peek():
+            self.consume()
+            return True
+
+        return False
+
+    def make_token(self, token_type, value, row, col):
+        return Token(token_type, value, row, col)
 
     def match_symbol(self):
-        for t_name, t_type in vars(TokenType).items():
-            if t_name.startswith('symbol_') and self.peek() == t_type.value:
-                self.col += 1
-                return Token(t_type, self.consume(), self.row, self.col)
+        for t_type in TokenType:
+            if t_type.name.startswith('symbol_') and self.peek() == t_type.value:
+                row, col = self.row, self.col
+                value = self.consume()
+
+                return self.make_token(t_type, value, row, col)
         else:
             return None
         
     def match_literal(self):
-        for t_name, t_type in vars(TokenType).items():
-            if t_name.startswith('lit_'):
-                ...
+        for t_type, pattern in LITERAL_PATTERNS.items():
+            if match := pattern.match(self.src, self.idx):
+                text = match.group(0)
+                row, col = self.row, self.col
+
+                value = self.consume(len(text))
+                return Token(t_type, value, row, col)
+
+        return None
 
     def match_keyword_ident(self):
         if self.peek().isalpha() or self.peek() == '_':
-            print('starter match:{}'.format(self.peek()))
             r_idx = self.idx + 1
             while r_idx < self.len and \
                 (self.peek_at(r_idx).isalnum() or self.peek_at(r_idx) == '_'):
                 r_idx += 1
-            print(r_idx)
-            for t_name, t_type in vars(TokenType).items():
-                if t_name.startswith('keyword_'):
-                    if self.peek_until(r_idx) == t_type.value:
-                        count = r_idx - self.idx
-                        tok = Token(t_type, self.consume_until(r_idx), self.row, self.col)
-                        self.col += count
-                        return tok
 
-            count = r_idx - self.idx
-            print('count: {}'.format(count))
-            tok = Token(TokenType.ident, self.consume_until(r_idx), self.row, self.col)
-            self.col += count
-            return tok
+            word = self.peek_until(r_idx)
+            t_type = KEYWORDS.get(word, TokenType.ident)
+
+            row, col = self.row, self.col
+            value = self.consume_until(r_idx)
+
+            return self.make_token(t_type, value, row, col)
         else:
             return None
         
@@ -144,3 +165,32 @@ if __name__ == '__main__':
     with open('src/test.volt') as file:
          input_string = file.read()
     t = Tokenizer(input_string)
+
+    # print(TokenType.symbol_dot)
+    # print(TokenType.symbol_dot.name)
+    # print(TokenType.symbol_dot.value)
+
+    print(t.match_keyword_ident())
+    t.skip_whitespace()
+    print(t.match_literal())
+    t.skip_whitespace()
+    print(t.match_symbol())
+    t.skip_whitespace()
+    print(t.match_keyword_ident())
+    t.skip_whitespace()
+    print(t.match_literal())
+    t.skip_whitespace()
+    print(t.match_symbol())
+
+    # lit = "\"string literal\""
+    # lit = "123.456"
+
+    # for t_type, pattern in LITERAL_PATTERNS.items():
+    #     if match := pattern.match(lit, 0):
+    #         text = match.group(0)
+    #         token = Tokenizer.make_token(None,
+    #                                      t_type,
+    #                                      text,
+    #                                      0, 0)
+    #         print(token)
+            

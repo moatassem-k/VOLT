@@ -1,28 +1,30 @@
 from enum import Enum, auto
+import re
 
 class TokenType(Enum):
-    keyword_if      = auto()
-    keyword_return  = auto()
-    keyword_exit    = auto()
+    keyword_if      = 'if'
+    keyword_else    = 'else'
+    keyword_return  = 'return'
+    keyword_exit    = 'exit'
 
-    symbol_dot      = auto()
-    symbol_comma    = auto()
-    symbol_semi     = auto()
-    symbol_colon    = auto()
-    symbol_plus     = auto()
-    symbol_minus    = auto()
-    symbol_star     = auto()
-    symbol_equal    = auto()
-    symbol_f_slash  = auto()
-    symbol_b_slash  = auto()
-    symbol_l_paren  = auto()
-    symbol_r_paren  = auto()
-    symbol_l_curly  = auto()
-    symbol_r_curly  = auto()
-    symbol_l_angle  = auto()
-    symbol_r_angle  = auto()
-    symbol_l_square = auto()
-    symbol_r_square = auto()
+    symbol_dot      = '.'
+    symbol_comma    = ','
+    symbol_semi     = ';'
+    symbol_colon    = ':'
+    symbol_plus     = '+'
+    symbol_minus    = '-'
+    symbol_star     = '*'
+    symbol_equal    = '='
+    symbol_l_paren  = '('
+    symbol_r_paren  = ')'
+    symbol_l_curly  = '{'
+    symbol_r_curly  = '}'
+    symbol_l_angle  = '<'
+    symbol_r_angle  = '>'
+    symbol_f_slash  = '/'
+    symbol_b_slash  ='\\'
+    symbol_l_square = '['
+    symbol_r_square = ']'
 
     ident           = auto()
 
@@ -31,7 +33,7 @@ class TokenType(Enum):
     lit_char        = auto()
     lit_str         = auto()
 
-    special_eof     = auto()
+    # special_eof     = auto()
 
 
 class Token:
@@ -73,4 +75,30 @@ class Tokenizer:
         else:
             self.idx += 1
             return self.src[self.idx - 1]
-    
+
+    def match_symbol(self):
+        for t_name, t_type in vars(TokenType).items():
+            if t_name.startswith('symbol_'):
+                if self.src[self.idx] == t_type.value:
+                    return Token(t_type, t_type.value)
+        else:
+            return None
+        
+    def match_literal(self):
+        pass
+    def match_keyword(self):
+        pass
+
+if __name__ == '__main__':
+    t = Tokenizer('+-*/=\\')
+    print(t.match_symbol())
+    t.consume()
+    print(t.match_symbol())
+    t.consume()
+    print(t.match_symbol())
+    t.consume()
+    print(t.match_symbol())
+    t.consume()
+    print(t.match_symbol())
+    t.consume()
+    print(t.match_symbol())

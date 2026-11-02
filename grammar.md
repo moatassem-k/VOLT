@@ -7,6 +7,6 @@ $$
                          \text{<strout>}\\
 \text{<exit>} 		&\to exit\space\text{<int\_lit>};\\
 \text{<strout>} 		&\to strout\space\text{<str\_lit>};\\
-\text{<if>} 		&\to if\space\text{<cond>}:\space\text{<statement>}
+\text{<if>} 		&\to if\space\text{<expr>}:\space\text{<statement>}
 \end{align}
 $$

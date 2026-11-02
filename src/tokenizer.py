@@ -6,6 +6,12 @@ class TokenType(Enum):
     keyword_else    = 'else'
     keyword_return  = 'return'
     keyword_exit    = 'exit'
+    keyword_logic_and  = 'AND'
+    keyword_logic_or   = 'OR'
+    keyword_logic_xor  = 'XOR'
+    keyword_logic_not  = 'NOT'
+    keyword_logic_nand = 'NAND'
+    keyword_logic_xnor = 'XNOR'
 
     symbol_dot      = '.'
     symbol_comma    = ','
@@ -27,6 +33,11 @@ class TokenType(Enum):
     symbol_l_square = '['
     symbol_r_square = ']'
 
+    symbol_ne       = '!='
+    symbol_eq_eq    = '=='
+    symbol_lt_eq    = '<='
+    symbol_gt_eq    = '>='
+
     ident           = auto()
 
     lit_int         = auto()
@@ -34,20 +45,27 @@ class TokenType(Enum):
     lit_char        = auto()
     lit_str         = auto()
 
-    # special_eof     = auto()
-
-class LitPatterns(Enum):
-    pattern_int   = r'\d+'
-    pattern_float = r'\d+\.\d+(?:[eE][+-]?\d+)?'
-    pattern_char  = r"'(?:\\.|[^'\\])'"
-    pattern_str   = r'"(?:\\.|[^"\\])*"'
+    special_eof     = auto()
 
 KEYWORDS = {
-    "if"     : TokenType.keyword_if,
-    "else"   : TokenType.keyword_else,
-    "return" : TokenType.keyword_return,
-    "exit"   : TokenType.keyword_exit,
+    t_type.value: t_type
+    for t_type in TokenType
+    if t_type.name.startswith('keyword_')
 }
+
+SYMBOLS = {
+    t_type.value: t_type
+    for t_type in TokenType
+    if t_type.name.startswith('symbol_')
+}
+
+MAX_SYMBOL_LENGTH = max(map(len, SYMBOLS))
+
+class LitPatterns(Enum):
+    pattern_float = r'\d+\.\d*(?:[eE][+-]?\d+)?|\d+[eE][+-]?\d+'
+    pattern_int   = r'\d+'
+    pattern_char = r"'(?:\\.|[^'\\\n])'"
+    pattern_str  = r'"(?:\\.|[^"\\\n])*"'
 
 LITERAL_PATTERNS = {
     TokenType.lit_float : re.compile(LitPatterns.pattern_float.value),
@@ -77,7 +95,32 @@ class Tokenizer:
         self.len = len(self.src)
 
     def tokenize(self):
-        ...
+        tokens = []
+        
+        while self.idx < self.len:
+            if self.skip_whitespace() or self.skip_comment():
+                continue
+
+            if self.idx >= self.len:
+                break
+
+            token = (
+                self.match_literal()
+                or self.match_keyword_ident()
+                or self.match_symbol()
+            )
+
+            if token is None:
+                raise SyntaxError(
+                    f"Unexpected character {self.peek()!r} "
+                    f"at {self.row}:{self.col}"
+                )
+
+            tokens.append(token)
+        tokens.append(Token(TokenType.special_eof,
+                            None,
+                            self.row, self.col))
+        return tokens
 
     def peek(self, offset = 0):
         index = self.idx + offset
@@ -112,22 +155,37 @@ class Tokenizer:
         return self.consume(r_idx - self.idx)
 
     def skip_whitespace(self):
-        if self.peek():
+        if (c := self.peek()) is not None and c.isspace():
             self.consume()
             return True
 
+        return False
+
+    def skip_comment(self):
+        if self.peek() == '/' and self.peek(1) == '/':
+            self.consume(2)
+
+            while (c := self.peek()) is not None and c != '\n':
+                self.consume()
+
+            return True
         return False
 
     def make_token(self, token_type, value, row, col):
         return Token(token_type, value, row, col)
 
     def match_symbol(self):
-        for t_type in TokenType:
-            if t_type.name.startswith('symbol_') and self.peek() == t_type.value:
-                row, col = self.row, self.col
-                value = self.consume()
+        max_len = min(MAX_SYMBOL_LENGTH, self.len - self.idx)
+        for length in range(max_len, 0, -1):
+            symbol = self.peek_until(self.idx + length)
 
-                return self.make_token(t_type, value, row, col)
+            if symbol in SYMBOLS:
+                row, col = self.row, self.col
+
+                return self.make_token(
+                    SYMBOLS[symbol],
+                    self.consume(length),
+                    row, col)
         else:
             return None
         
@@ -143,7 +201,7 @@ class Tokenizer:
         return None
 
     def match_keyword_ident(self):
-        if self.peek().isalpha() or self.peek() == '_':
+        if (c := self.peek()) is not None and (c.isalpha() or c == '_'):
             r_idx = self.idx + 1
             while r_idx < self.len and \
                 (self.peek_at(r_idx).isalnum() or self.peek_at(r_idx) == '_'):
@@ -164,33 +222,10 @@ if __name__ == '__main__':
     input_string = ''
     with open('src/test.volt') as file:
          input_string = file.read()
+
     t = Tokenizer(input_string)
 
-    # print(TokenType.symbol_dot)
-    # print(TokenType.symbol_dot.name)
-    # print(TokenType.symbol_dot.value)
+    for token in t.tokenize():
+        print(token)
 
-    print(t.match_keyword_ident())
-    t.skip_whitespace()
-    print(t.match_literal())
-    t.skip_whitespace()
-    print(t.match_symbol())
-    t.skip_whitespace()
-    print(t.match_keyword_ident())
-    t.skip_whitespace()
-    print(t.match_literal())
-    t.skip_whitespace()
-    print(t.match_symbol())
-
-    # lit = "\"string literal\""
-    # lit = "123.456"
-
-    # for t_type, pattern in LITERAL_PATTERNS.items():
-    #     if match := pattern.match(lit, 0):
-    #         text = match.group(0)
-    #         token = Tokenizer.make_token(None,
-    #                                      t_type,
-    #                                      text,
-    #                                      0, 0)
-    #         print(token)
             

@@ -10,7 +10,9 @@ def main():
     with open(sys.argv[1]) as input_file:
         input_string = input_file.read()
 
-    print(input_string)
+    with open(sys.argv[2], "w+") as output_file:
+        print(output_file.name)
+        output_file.write(input_string)
 
 if __name__ == "__main__":
     sys.exit(main())

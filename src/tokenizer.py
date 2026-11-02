@@ -36,11 +36,41 @@ class TokenType(Enum):
 
 class Token:
 	def __init__(self, type, value = None, row = 0, col = 0):
-		self.type = type
+		self.type  = type
 		self.value = value
-		self.row = row
-		self.col = col
+		self.row   = row
+		self.col   = col
 
 	def __repr__(self):
 		value = f"[{self.value}]" if self.value else ''
 		return f"{self.type.name}({self.row}, {self.col}){value}"
+
+
+class Tokenizer:
+    def __init__(self, input_string):
+        self.src = input_string
+        self.row = 1
+        self.col = 1
+        self.idx = 0
+        self.len = len(self.src)
+
+    def peek(self, offset = 0):
+        index = 0
+        if (index := self.idx + offset) >= self.len:
+            return None
+        return self.src[index]
+
+    def peek_with_type(self, check_fn, offset = 0):
+        c = self.peek(offset)
+        if c and check_fn(c):
+            return c
+        return None
+
+    def consume(self, count = 0):
+        if count > 0:
+            self.idx += count
+            return self.src[self.idx-count : self.idx]
+        else:
+            self.idx += 1
+            return self.src[self.idx - 1]
+    
